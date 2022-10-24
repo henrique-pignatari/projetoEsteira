@@ -1,5 +1,6 @@
 #include<Wire.h>
 #include<LiquidCrystal_I2C.h>
+#include <Servo.h>
 
 LiquidCrystal_I2C lcd(0x27,16,2);
 
@@ -199,9 +200,7 @@ class OPSensorArray{
     }
 
     String getState(){
-      Serial.println("PINTO");
       for(int i = 0; i < OP_SENSOR_COUNT; i++){
-        Serial.println(states[i]);
         if(states[i]){
           return(sensors[i]->getName());
         }
@@ -216,44 +215,137 @@ class OPSensorArray{
     } 
 };
 
+class Output{
+  private:
+  Servo* _servo;
+  bool state;
+  int openAngle = 0;
+  int closedAngle = 70;
+  String _name;
+  
+  public:
+  Output(Servo* servo, String name){
+    _servo = servo;
+    _name = name;
+    state = false;
+  }
+
+  void setServoState(bool state){
+    int angle;
+    int mod = 0;
+
+    if(state){
+      angle = closedAngle;
+    }else{
+      angle = openAngle;
+    }
+
+    int initAngle = _servo->read();
+    Serial.println(angle);
+    Serial.println(initAngle);
+
+    for(int i = initAngle; i != angle; i+=mod){
+
+      _servo->write(i);
+
+      if(i > angle){
+        mod = -1;
+      }else{
+        mod = 1;
+      }
+
+      delay(15);
+    }
+  }
+
+  String getMaterial(){
+    return _name;
+  }
+};
+
+#define SERVO_COUNT 3
+
+class ServoArray{
+  private:
+  int _count;
+  Output* servos[SERVO_COUNT];
+
+  public:
+  ServoArray(){}
+
+  void addNew(Output* servo){
+    if(_count < SERVO_COUNT){
+      servos[_count] = servo;
+      _count++;
+    }
+  }
+
+  void moveServo(String name, bool state){
+    for(int i = 0; i < _count; i++){
+      if(servos[i]->getMaterial() == name){
+        servos[i]->setServoState(state);
+      }
+    }
+  }
+};
+
 #define MOTOR_PIN 8
 
+#define SERVO_METAL 9
+#define SERVO_VIDRO 10
+#define SERVO_PLASTICO 11
+
 #define IND_SENS_PIN 2
-#define CAP_SENS_PIN 3
-#define CAP_SENS_PIN_2 4
+#define CAP_SENS_VIDRO 3
+#define CAP_SENS_PLASTICO 4
 
-#define OP_SENS_PIN 5
-#define OP_SENS_PIN_2 6
-#define OP_SENS_PIN_3 7
-#define OP_SENS_PIN_4 8
-#define OP_SENS_PIN_5 9
+#define OP_SENS_FINAL 5
+#define OP_SENS_METAL 6
+#define OP_SENS_VIDRO 7
+#define OP_SENS_PLASTICO 8
+#define OP_SENS_PAPEL 12
 
-#define RESET_BUTTON 10
+#define RESET_BUTTON 13
 
 bool cycleReady = true;
 
 Motor motor(MOTOR_PIN);
 
 IDSensor sensorInd(IND_SENS_PIN, "INDUTIVO","METAL");
-IDSensor sensorCap1(CAP_SENS_PIN, "CAPACITIVO 1","VIDRO");
-IDSensor sensorCap2(CAP_SENS_PIN_2, "CAPACITIVO 2","PLASTICO");
+IDSensor sensorCap1(CAP_SENS_VIDRO, "CAPACITIVO 1","VIDRO");
+IDSensor sensorCap2(CAP_SENS_PLASTICO, "CAPACITIVO 2","PLASTICO");
 
-OpticalSensor sensorOP1(OP_SENS_PIN, "FINAL");
+OpticalSensor sensorOP1(OP_SENS_FINAL, "FINAL");
 
-OpticalSensor sensorOP2(OP_SENS_PIN_2, "METAL");
-OpticalSensor sensorOP3(OP_SENS_PIN_3, "VIDRO");
-OpticalSensor sensorOP4(OP_SENS_PIN_4, "PLASTICO");
-OpticalSensor sensorOP5(OP_SENS_PIN_5, "PAPEL");
+OpticalSensor sensorOP2(OP_SENS_METAL, "METAL");
+OpticalSensor sensorOP3(OP_SENS_VIDRO, "VIDRO");
+OpticalSensor sensorOP4(OP_SENS_PLASTICO, "PLASTICO");
+OpticalSensor sensorOP5(OP_SENS_PAPEL, "PAPEL");
 
 IDSensorArray IDsensors;
 OPSensorArray OPsensors;
 
 IHM ihm(&lcd);
 
+Servo servo1;
+Servo servo2;
+Servo servo3;
+
+Output servoMetal(&servo1, "METAL");
+Output servoVidro(&servo2, "VIDRO");
+Output servoPlastico(&servo3, "PLASTICO");
+
+
+ServoArray Servos;
+
 void setup()
 {
   Serial.begin(9600);
   
+  servo1.attach(SERVO_METAL);
+  servo2.attach(SERVO_VIDRO);
+  servo3.attach(SERVO_PLASTICO);
+
   IDsensors.addNew(&sensorCap1);
   IDsensors.addNew(&sensorCap2);
   IDsensors.addNew(&sensorInd);
@@ -263,6 +355,10 @@ void setup()
   OPsensors.addNew(&sensorOP3);
   OPsensors.addNew(&sensorOP4);
   OPsensors.addNew(&sensorOP5);
+
+  Servos.addNew(&servoMetal);
+  Servos.addNew(&servoVidro);
+  Servos.addNew(&servoPlastico);
 
   ihm.init();
 }
@@ -293,6 +389,8 @@ void loop()
         expectedMaterial = "PAPEL";
       }
       
+      Servos.moveServo(expectedMaterial, false);
+
       IDsensors.resetState();
       OPsensors.resetState();
       cycleReady = false;
@@ -308,6 +406,7 @@ void loop()
           trashCount[i]++;
         }
       }
+      Servos.moveServo(expectedMaterial, true);
       cycleReady = true;
     } 
     OPsensors.resetState();
