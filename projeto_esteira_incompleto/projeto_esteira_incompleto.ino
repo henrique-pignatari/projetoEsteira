@@ -16,7 +16,7 @@ bool switchMessage = false;
 bool cycleReady = true;
 
 bool erro = false;
-int errorTime = 2000;
+int errorTime = 5000;
 
 const int numOfmat = 4;
 String materials[] = {"METAL", "PLASTICO", "PAPEL", "VIDRO"};
@@ -423,7 +423,7 @@ void setup()
   Servos.addNew(&servoPlastico);
 
   Servos.resetAllServos();
-  
+
   ihm.init();
 }
 
@@ -466,10 +466,9 @@ void loop(){
       OPsensors.resetState();
     }
   }else if(!erro){
-    Serial.println(millis() - materialTime);
-     if(millis() - materialTime > errorTime){
-       erro = true;
-     }
+    if(millis() - materialTime > errorTime){
+      erro = true;
+    }
 
     if(expectedMaterial == ""){
       IDsensors.checkAll(); 
@@ -490,23 +489,21 @@ void loop(){
         OPsensors.resetState();
       }
     }else{
-      OPsensors.resetState();
-      OPsensors.checkAll();
 
-      String state = OPsensors.getState();
-      if(state == expectedMaterial){
+      if(erro){
+        erro = false;
         for(int i = 0; i < numOfmat; i++){
-          if(materials[i] == state){
+          if(materials[i] == expectedMaterial){
             trashCount[i]++;
           }
         }
 
-        Servos.moveServo(expectedMaterial, true);
-        cycleReady = true;
-
-        expectedMaterial = "" ;
+        IDsensors.resetState();
         OPsensors.resetState();
-      } 
+        Servos.resetAllServos();
+        expectedMaterial = "";
+        cycleReady = true;
+      }
     }
   }
 }
