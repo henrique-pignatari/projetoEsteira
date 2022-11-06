@@ -237,7 +237,7 @@ class IDSensorArray{
   String getMaterial(){ //RETURN THE MATERIAL THAT WAS IDENTIFIED BY THE SENSORS
     for(int i = 0; i < ID_SENSOR_COUNT; i++){
       states[i];
-      if(states[i]){
+      if(!states[i]){
         return sensors[i]->_material;
       } 
     }
@@ -246,7 +246,7 @@ class IDSensorArray{
   
   void resetState(){ //RESETS THE STATES OF ALL SENSORS
     for(int i = 0; i < ID_SENSOR_COUNT; i++){
-      states[i] = false;
+      states[i] = true;
     }
   }
 };
@@ -298,8 +298,8 @@ class Output{
   private:
   Servo* _servo;
   bool state;
-  int openAngle = 0;
-  int closedAngle = 70;
+  int openAngle = 120;
+  int closedAngle = 180;
   String _name;
   
   public:
@@ -320,8 +320,6 @@ class Output{
     }
 
     int initAngle = _servo->read();
-    Serial.println(angle);
-    Serial.println(initAngle);
 
     for(int i = initAngle; i != angle; i+=mod){
 

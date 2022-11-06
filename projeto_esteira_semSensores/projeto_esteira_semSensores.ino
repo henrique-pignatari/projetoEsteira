@@ -16,7 +16,7 @@ bool switchMessage = false;
 bool cycleReady = true;
 
 bool erro = false;
-int errorTime = 5000;
+int errorTime = 2000;
 
 const int numOfmat = 4;
 String materials[] = {"METAL", "PLASTICO", "PAPEL", "VIDRO"};
@@ -237,7 +237,7 @@ class IDSensorArray{
   String getMaterial(){ //RETURN THE MATERIAL THAT WAS IDENTIFIED BY THE SENSORS
     for(int i = 0; i < ID_SENSOR_COUNT; i++){
       states[i];
-      if(!states[i]){
+      if(states[i]){
         return sensors[i]->_material;
       } 
     }
@@ -246,7 +246,7 @@ class IDSensorArray{
   
   void resetState(){ //RESETS THE STATES OF ALL SENSORS
     for(int i = 0; i < ID_SENSOR_COUNT; i++){
-      states[i] = true;
+      states[i] = false;
     }
   }
 };
@@ -298,8 +298,8 @@ class Output{
   private:
   Servo* _servo;
   bool state;
-  int openAngle = 120;
-  int closedAngle = 180;
+  int openAngle = 0;
+  int closedAngle = 70;
   String _name;
   
   public:
@@ -423,10 +423,10 @@ void setup()
   Servos.addNew(&servoPlastico);
 
   Servos.resetAllServos();
-
+  
   ihm.init();
 }
-
+bool identified = false;
 void loop(){
   
   //ATUALIZA IHM
@@ -451,59 +451,27 @@ void loop(){
   if(!motor.state){
     motor.turnOn();
   }
-  
-  // CONFERE SE O CILO ESTÁ PRONTO
-  if(cycleReady && !erro){
-    //CONFERE TODOS OS SENSORES
-    OPsensors.resetState();
-    OPsensors.checkAll();
 
-    //CONFERE O ESTADO DOS SENSORES 
-    if(OPsensors.getState() == "START"){
-      materialTime = millis();
-      cycleReady = false;
-      IDsensors.resetState();
-      OPsensors.resetState();
-    }
-  }else if(!erro){
+  if(!identified){
+    IDsensors.checkAll(); 
+    expectedMaterial = IDsensors.getMaterial();
+  }else{
     if(millis() - materialTime > errorTime){
-      erro = true;
+      identified = false;
+      Servos.resetAllServos();
     }
+  }
 
-    if(expectedMaterial == ""){
-      IDsensors.checkAll(); 
-      OPsensors.checkAll();
-
-      if(IDsensors.getMaterial() != "NONE" || OPsensors.getState() == "FINAL"){
-
-        expectedMaterial = IDsensors.getMaterial();
-
-        if(expectedMaterial == "NONE"){
-          expectedMaterial = "PAPEL";
-        }
-        
-        Servos.moveServo(expectedMaterial, false);
-        materialTime = millis();
-
-        IDsensors.resetState();
-        OPsensors.resetState();
+  if(expectedMaterial != "NONE"){
+    IDsensors.resetState();
+    for(int i = 0; i < numOfmat; i++){
+      if(materials[i] == expectedMaterial){
+        trashCount[i]++;
       }
-    }else{
-
-      if(erro){
-        erro = false;
-        for(int i = 0; i < numOfmat; i++){
-          if(materials[i] == expectedMaterial){
-            trashCount[i]++;
-          }
-        }
-
-        IDsensors.resetState();
-        OPsensors.resetState();
-        Servos.resetAllServos();
-        expectedMaterial = "";
-        cycleReady = true;
-      }
+      Servos.moveServo(expectedMaterial, false);
+      expectedMaterial = "NONE";
+      identified = true;
+      materialTime = millis();
     }
   }
 }
