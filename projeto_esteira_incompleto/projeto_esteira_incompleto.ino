@@ -4,7 +4,7 @@
 #include <Servo.h>
 
 //DECLARE GLOBALS
-LiquidCrystal_I2C lcd(0x27,16,2);
+LiquidCrystal_I2C lcd(0x3f,20,4);
 
 String expectedMaterial = "";
 int period = 3000;
@@ -16,7 +16,7 @@ bool switchMessage = false;
 bool cycleReady = true;
 
 bool erro = false;
-int errorTime = 5000;
+int errorTime = 15000;
 
 const int numOfmat = 4;
 String materials[] = {"METAL", "PLASTICO", "PAPEL", "VIDRO"};
@@ -34,21 +34,21 @@ Servo servo3;
 //PIN DEFINES
 #define SERVO_METAL 2
 #define SERVO_VIDRO 3
-#define SERVO_PLASTICO 4
+#define SERVO_PAPEL 4
 
-#define MOTOR_RIGHT_PIN 5
-#define MOTOR_LEFT_PIN  6
+#define MOTOR_PIN 5
 
 #define IND_SENS_PIN 53
 #define CAP_SENS_VIDRO 51
-#define CAP_SENS_PLASTICO 49
+#define CAP_SENS_PAPEL 49
 
-#define OP_SENS_FINAL 47
-#define OP_SENS_START 35
+//#define OP_SENS_FINAL 47
+//#define OP_SENS_START 35
+
 #define OP_SENS_METAL 45
 #define OP_SENS_VIDRO 43
-#define OP_SENS_PLASTICO 41
-#define OP_SENS_PAPEL 39
+#define OP_SENS_PAPEL 41
+#define OP_SENS_PLASTICO 39
 
 #define RESET_BUTTON 37
 
@@ -129,39 +129,22 @@ class IHM{
 //CLASS FOR CONTROLLING THE MOTOR
 class Motor{
   public:
-  int _RPWMPIN;
-  int _LPWMPIN; 
+  int _PIN;
   bool state = false;
   
-  Motor(int RPWMPin, int LPWMPin){
-    this->_RPWMPIN = RPWMPin;
-    this->_LPWMPIN = LPWMPin;
-  } 
-  void ClockWise(int pwm){
-    int command[] = {pwm, 0};
-    controlMotor(command);
+  Motor(int Pin){
+    this->_PIN = Pin;
   }
-  void CounterClockWise(int pwm){
-    int command[] = {0, pwm};
-    controlMotor(command);
-  }
-  void fullStop(){
-    int command[] = {0, 0};
-    controlMotor(command);
-    state = false;
-  } 
-  void controlMotor(int command[]){
-    analogWrite(_RPWMPIN,command[0]);
-    analogWrite(_LPWMPIN, command[1]);
-  }  
+
   void turnOn(){    
-    for(int pwm = 0; pwm < 200; pwm++){
-      ClockWise(pwm);
-      Serial.println(pwm);
-      delay(15);
-    }
+    digitalWrite(_PIN, false);
     state = true;
   } 
+
+  void turnOff(){
+    digitalWrite(_PIN, true);
+    state = false;
+  }
 };
 
 //CLASS FOR CONTROLLING THE SENSORS
@@ -173,13 +156,13 @@ class Sensor{
   public:
   
   Sensor(int pin, String name){ //CONSTRUCTOR
-    pinMode(pin, INPUT);
+    pinMode(pin, INPUT_PULLUP);
     _sensor_pin = pin;
     _name = name;
   }
   
   bool read(){ //READS THE SENSOR AND RETURN ITS VALUE
-    return digitalRead(_sensor_pin);
+    return !digitalRead(_sensor_pin);
   }
 
   String getName(){ //RETURNS SENSORS NAME
@@ -237,7 +220,7 @@ class IDSensorArray{
   String getMaterial(){ //RETURN THE MATERIAL THAT WAS IDENTIFIED BY THE SENSORS
     for(int i = 0; i < ID_SENSOR_COUNT; i++){
       states[i];
-      if(!states[i]){
+      if(states[i]){
         return sensors[i]->_material;
       } 
     }
@@ -246,7 +229,7 @@ class IDSensorArray{
   
   void resetState(){ //RESETS THE STATES OF ALL SENSORS
     for(int i = 0; i < ID_SENSOR_COUNT; i++){
-      states[i] = true;
+      states[i] = false;
     }
   }
 };
@@ -298,8 +281,8 @@ class Output{
   private:
   Servo* _servo;
   bool state;
-  int openAngle = 120;
-  int closedAngle = 180;
+  int openAngle = 170;
+  int closedAngle = 115;
   String _name;
   
   public:
@@ -320,8 +303,6 @@ class Output{
     }
 
     int initAngle = _servo->read();
-    Serial.println(angle);
-    Serial.println(initAngle);
 
     for(int i = initAngle; i != angle; i+=mod){
 
@@ -333,7 +314,7 @@ class Output{
         mod = 1;
       }
 
-      delay(15);
+      delay(10);
     }
   }
 
@@ -373,14 +354,14 @@ class ServoArray{
 };
 
 //CLASSES INITIALIZATIONS
-Motor motor(MOTOR_RIGHT_PIN,MOTOR_LEFT_PIN);
+Motor motor(MOTOR_PIN);
 
 IDSensor sensorInd(IND_SENS_PIN, "INDUTIVO","METAL");
 IDSensor sensorCap1(CAP_SENS_VIDRO, "CAPACITIVO 1","VIDRO");
-IDSensor sensorCap2(CAP_SENS_PLASTICO, "CAPACITIVO 2","PLASTICO");
+IDSensor sensorCap2(CAP_SENS_PAPEL, "CAPACITIVO 2","PAPEL");
 
-OpticalSensor sensorOP1(OP_SENS_FINAL, "FINAL");
-OpticalSensor sensorOP6(OP_SENS_START,"START");
+//OpticalSensor sensorOP1(OP_SENS_FINAL, "FINAL");
+//OpticalSensor sensorOP6(OP_SENS_START,"START");
 
 OpticalSensor sensorOP2(OP_SENS_METAL, "METAL");
 OpticalSensor sensorOP3(OP_SENS_VIDRO, "VIDRO");
@@ -394,7 +375,7 @@ IHM ihm(&lcd);
 
 Output servoMetal(&servo1, "METAL");
 Output servoVidro(&servo2, "VIDRO");
-Output servoPlastico(&servo3, "PLASTICO");
+Output servoPapel(&servo3, "PAPEL");
 
 
 ServoArray Servos;
@@ -405,22 +386,22 @@ void setup()
   
   servo1.attach(SERVO_METAL);
   servo2.attach(SERVO_VIDRO);
-  servo3.attach(SERVO_PLASTICO);
+  servo3.attach(SERVO_PAPEL);
 
   IDsensors.addNew(&sensorCap1);
   IDsensors.addNew(&sensorCap2);
   IDsensors.addNew(&sensorInd);
 
-  OPsensors.addNew(&sensorOP1);
+  //OPsensors.addNew(&sensorOP1);
   OPsensors.addNew(&sensorOP2);
   OPsensors.addNew(&sensorOP3);
   OPsensors.addNew(&sensorOP4);
   OPsensors.addNew(&sensorOP5);
-  OPsensors.addNew(&sensorOP6);
+  //OPsensors.addNew(&sensorOP6);
 
   Servos.addNew(&servoMetal);
   Servos.addNew(&servoVidro);
-  Servos.addNew(&servoPlastico);
+  Servos.addNew(&servoPapel);
 
   Servos.resetAllServos();
 
@@ -443,8 +424,8 @@ void loop(){
 
     }else{
       for(int i = 0; i < numOfmat; i++){
-      trashCount[i] = 0;
-    }
+        trashCount[i] = 0;
+      }
     }
   }
 
@@ -453,35 +434,19 @@ void loop(){
   }
   
   // CONFERE SE O CILO ESTÁ PRONTO
-  if(cycleReady && !erro){
-    //CONFERE TODOS OS SENSORES
-    OPsensors.resetState();
-    OPsensors.checkAll();
-
-    //CONFERE O ESTADO DOS SENSORES 
-    if(OPsensors.getState() == "START"){
-      materialTime = millis();
-      cycleReady = false;
-      IDsensors.resetState();
-      OPsensors.resetState();
-    }
-  }else if(!erro){
-    if(millis() - materialTime > errorTime){
-      erro = true;
-    }
-
+  if(!erro){
     if(expectedMaterial == ""){
       IDsensors.checkAll(); 
       OPsensors.checkAll();
 
-      if(IDsensors.getMaterial() != "NONE" || OPsensors.getState() == "FINAL"){
+      if(IDsensors.getMaterial() != "NONE" || OPsensors.getState() == "PLASTICO"){
 
         expectedMaterial = IDsensors.getMaterial();
 
         if(expectedMaterial == "NONE"){
-          expectedMaterial = "PAPEL";
+          expectedMaterial = "PLASTICO";
         }
-        
+
         Servos.moveServo(expectedMaterial, false);
         materialTime = millis();
 
@@ -489,20 +454,28 @@ void loop(){
         OPsensors.resetState();
       }
     }else{
+      if(millis() - materialTime > errorTime){
+        erro = true;
+      }
 
-      if(erro){
-        erro = false;
+      OPsensors.checkAll();
+      String state = IDsensors.getMaterial();
+
+      if(state == expectedMaterial || expectedMaterial == "PLASTICO"){
         for(int i = 0; i < numOfmat; i++){
           if(materials[i] == expectedMaterial){
             trashCount[i]++;
           }
+        }
+        
+        while(OPsensors.getState() == "PLASTICO"){
+          OPsensors.checkAll();
         }
 
         IDsensors.resetState();
         OPsensors.resetState();
         Servos.resetAllServos();
         expectedMaterial = "";
-        cycleReady = true;
       }
     }
   }
